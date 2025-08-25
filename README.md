@@ -1,4 +1,4 @@
-# -QA_VS
+# QA_VS
 Test task - Folder Sync
 
 Test Task
