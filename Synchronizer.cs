@@ -26,17 +26,18 @@ public class Synchronizer
         iLogger.Log($"Try Sync from path {sourcePath} to {replicaPath}");
         CheckDirectories();
 
-        sourceFilesList = GetFilesInDirectory(sourcePath);
-        replicaFilesList = GetFilesInDirectory(replicaPath);
         //get files in source
         //get files in replica
-
-
+        sourceFilesList = GetFilesInDirectory(sourcePath);
+        replicaFilesList = GetFilesInDirectory(replicaPath);
         // if file exist in replica && !exist in source delete in replica  + Log File removed 
         RemoveAdditionalFiles();
+        RemoveAdditionalDirectories();
         // if file exist in replica compare MD5 => if different copy file + Log Replace file
         ReplaceExistingFiles();
         // if file !exist in replica copy file + Log Add file
+        AddAdditionalDirectories();
+        AddNewFiles();
     }
 
     void CheckDirectories()
@@ -48,7 +49,7 @@ public class Synchronizer
         }
         catch (Exception e)
         {
-            Console.WriteLine("The process failed: {0}", e.ToString());
+            Console.WriteLine("The process failed: {0}", e);
             iLogger.Log("Error Occured");
         }
     }
@@ -56,13 +57,11 @@ public class Synchronizer
     Dictionary<string, FileInfo> GetFilesInDirectory(string path)
     {
         string[] fullPath = Directory.GetFiles(path, "*.*", SearchOption.AllDirectories);
-        // string[] relativePathArray = new string[fullPath.Length];
         Dictionary<string, FileInfo> fileList = new Dictionary<string, FileInfo>();
-        for (var index = 0; index < fullPath.Length; index++)
+        foreach (var file in fullPath)
         {
-            var relativePath = Path.GetRelativePath(path, fullPath[index]);
-            //    relativePathArray[index] = relativePath;
-            fileList.Add(relativePath, new FileInfo(fullPath[index]));
+            var relativePath = Path.GetRelativePath(path, file);
+            fileList.Add(relativePath, new FileInfo(file));
         }
 
         Console.WriteLine($"Found {fileList.Count} files in {path}");
@@ -77,8 +76,28 @@ public class Synchronizer
             {
                 iLogger.Log(FileAction.Removed, $"{replicaFile} was removed from Replica at {replicaFilesList[replicaFile].FullName}");
                 replicaFilesList.Remove(replicaFile);
-                //File.Delete(Path.Combine(replicaPath,replicaFile));
-                // FileSystem.DeleteFile(Path.Combine(replicaPath,replicaFile), UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+#if DEBUG
+                FileSystem.DeleteFile(Path.Combine(replicaPath, replicaFile), UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+#else
+                File.Delete(Path.Combine(replicaPath, replicaFile));
+#endif
+            }
+        }
+    }
+
+    void RemoveAdditionalDirectories()
+    {
+        var replicaDirs = Directory.GetDirectories(replicaPath, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length);
+
+        foreach (var dir in replicaDirs)
+        {
+            var relativePath = Path.GetRelativePath(replicaPath, dir);
+            var sourceDirPath = Path.Combine(sourcePath, relativePath);
+
+            if (!Directory.Exists(sourceDirPath) && !Directory.EnumerateFileSystemEntries(dir).Any())
+            {
+                iLogger.Log(FileAction.Removed, $"{dir} directory was removed from Replica ");
+                Directory.Delete(dir);
             }
         }
     }
@@ -91,21 +110,49 @@ public class Synchronizer
             {
                 if (replicaFilesList[file].Length != sourceFilesList[file].Length)
                 {
-                    Console.WriteLine($"{file} form replica is {replicaFilesList[file].Length} but in source is {sourceFilesList[file].Length}");
                     CopyFile(file);
+                    iLogger.Log(FileAction.Replaced, $"{file} in replica was replaced from Source at {sourceFilesList[file].FullName} because it's size was different");
                 }
                 else
                 {
+                    var replicaMd5 = ComputeMd5(replicaFilesList[file]);
+                    var sourceMd5 = ComputeMd5(sourceFilesList[file]);
+                    if (!replicaMd5.SequenceEqual(sourceMd5))
                     {
-                        var replicaMd5 = ComputeMd5(replicaFilesList[file]);
-                        var sourceMd5 = ComputeMd5(sourceFilesList[file]);
-                        if (!replicaMd5.SequenceEqual(sourceMd5))
-                        {
-                            Console.WriteLine($"{file} MD5 is different from source MD5");
-                            CopyFile(file);
-                        }
+                        CopyFile(file);
+                        iLogger.Log(FileAction.Replaced, $"{file} in replica was replaced from Source at {sourceFilesList[file].FullName} because it's content was different");
                     }
                 }
+            }
+        }
+    }
+
+    void AddNewFiles()
+    {
+        foreach (var file in sourceFilesList.Keys)
+        {
+            if (!replicaFilesList.ContainsKey(file))
+            {
+                CopyFile(file);
+                replicaFilesList.Add(file, new FileInfo(file));
+                iLogger.Log(FileAction.Added, $"{file} was Added from Source");
+            }
+        }
+    }
+    
+    void AddAdditionalDirectories()
+    {
+        var sourceDirs = Directory.GetDirectories(sourcePath, "*", SearchOption.AllDirectories).OrderBy(d => d.Length);
+
+        foreach (var dir in sourceDirs)
+        {
+            var relativePath = Path.GetRelativePath(sourcePath, dir);
+            var replicaDirPath = Path.Combine(replicaPath, relativePath);
+
+            if (!Directory.Exists(replicaDirPath))
+            {
+                iLogger.Log(FileAction.Added, $"{dir} directory was Added from Source");
+                Directory.CreateDirectory(replicaDirPath);
             }
         }
     }
@@ -120,7 +167,12 @@ public class Synchronizer
     void CopyFile(string file)
     {
         var fileToCopy = sourceFilesList[file].FullName;
-        File.Copy(fileToCopy, Path.Combine(replicaPath, file), true);
-        iLogger.Log(FileAction.Replaced, $"{file} in replica was replaced from Source at {sourceFilesList[file].FullName}");
+        var destinationFilePath = Path.Combine(replicaPath, file);
+
+        var destDir = Path.GetDirectoryName(destinationFilePath);
+        if (destDir != null)
+            Directory.CreateDirectory(destDir);
+
+        File.Copy(fileToCopy, destinationFilePath, true);
     }
 }
