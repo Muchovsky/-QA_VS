@@ -2,7 +2,7 @@
 
 if (args.Length != 4)
 {
-    Console.WriteLine("You should use 4 arguments");
+    Console.WriteLine("You should use 4 arguments: source path, replica path, interval in seconds, log file path");
     return;
 }
 

@@ -6,12 +6,11 @@ namespace QA_VS;
 
 public class Synchronizer
 {
+    readonly ILogger iLogger;
     string sourcePath;
     string replicaPath;
     Dictionary<string, FileInfo> sourceFilesList;
     Dictionary<string, FileInfo> replicaFilesList;
-
-    readonly ILogger iLogger;
 
     public Synchronizer(ILogger iLogger)
     {
@@ -20,22 +19,15 @@ public class Synchronizer
 
     public void Synchronize(string sourcePath, string replicaPath)
     {
+        iLogger.Log($"Try Sync from path {sourcePath} to {replicaPath}");
         this.sourcePath = sourcePath;
         this.replicaPath = replicaPath;
-
-        iLogger.Log($"Try Sync from path {sourcePath} to {replicaPath}");
         CheckDirectories();
-
-        //get files in source
-        //get files in replica
         sourceFilesList = GetFilesInDirectory(sourcePath);
         replicaFilesList = GetFilesInDirectory(replicaPath);
-        // if file exist in replica && !exist in source delete in replica  + Log File removed 
         RemoveAdditionalFiles();
         RemoveAdditionalDirectories();
-        // if file exist in replica compare MD5 => if different copy file + Log Replace file
         ReplaceExistingFiles();
-        // if file !exist in replica copy file + Log Add file
         AddAdditionalDirectories();
         AddNewFiles();
     }
@@ -56,8 +48,8 @@ public class Synchronizer
 
     Dictionary<string, FileInfo> GetFilesInDirectory(string path)
     {
-        string[] fullPath = Directory.GetFiles(path, "*.*", SearchOption.AllDirectories);
-        Dictionary<string, FileInfo> fileList = new Dictionary<string, FileInfo>();
+        var fullPath = Directory.GetFiles(path, "*.*", SearchOption.AllDirectories);
+        var fileList = new Dictionary<string, FileInfo>();
         foreach (var file in fullPath)
         {
             var relativePath = Path.GetRelativePath(path, file);
@@ -74,7 +66,7 @@ public class Synchronizer
         {
             if (!sourceFilesList.ContainsKey(replicaFile))
             {
-                iLogger.Log(FileAction.Removed, $"{replicaFile} was removed from Replica at {replicaFilesList[replicaFile].FullName}");
+                iLogger.Log(FileAction.Removed, $" {replicaFile} was removed from replica at {replicaFilesList[replicaFile].FullName}");
                 replicaFilesList.Remove(replicaFile);
 #if DEBUG
                 FileSystem.DeleteFile(Path.Combine(replicaPath, replicaFile), UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
@@ -96,7 +88,7 @@ public class Synchronizer
 
             if (!Directory.Exists(sourceDirPath) && !Directory.EnumerateFileSystemEntries(dir).Any())
             {
-                iLogger.Log(FileAction.Removed, $"{dir} directory was removed from Replica ");
+                iLogger.Log(FileAction.Removed, $" {dir} directory was removed from replica ");
                 Directory.Delete(dir);
             }
         }
@@ -111,7 +103,7 @@ public class Synchronizer
                 if (replicaFilesList[file].Length != sourceFilesList[file].Length)
                 {
                     CopyFile(file);
-                    iLogger.Log(FileAction.Replaced, $"{file} in replica was replaced from Source at {sourceFilesList[file].FullName} because it's size was different");
+                    iLogger.Log(FileAction.Replaced, $" {file} in replica was replaced from source at {sourceFilesList[file].FullName} because it's size was different");
                 }
                 else
                 {
@@ -120,7 +112,7 @@ public class Synchronizer
                     if (!replicaMd5.SequenceEqual(sourceMd5))
                     {
                         CopyFile(file);
-                        iLogger.Log(FileAction.Replaced, $"{file} in replica was replaced from Source at {sourceFilesList[file].FullName} because it's content was different");
+                        iLogger.Log(FileAction.Replaced, $" {file} in replica was replaced from Source at {sourceFilesList[file].FullName} because it's content was different");
                     }
                 }
             }
@@ -135,23 +127,21 @@ public class Synchronizer
             {
                 CopyFile(file);
                 replicaFilesList.Add(file, new FileInfo(file));
-                iLogger.Log(FileAction.Added, $"{file} was Added from Source");
+                iLogger.Log(FileAction.Added, $" {file} was Added from Source");
             }
         }
     }
-    
+
     void AddAdditionalDirectories()
     {
         var sourceDirs = Directory.GetDirectories(sourcePath, "*", SearchOption.AllDirectories).OrderBy(d => d.Length);
-
         foreach (var dir in sourceDirs)
         {
             var relativePath = Path.GetRelativePath(sourcePath, dir);
             var replicaDirPath = Path.Combine(replicaPath, relativePath);
-
             if (!Directory.Exists(replicaDirPath))
             {
-                iLogger.Log(FileAction.Added, $"{dir} directory was Added from Source");
+                iLogger.Log(FileAction.Added, $" {dir} directory was added from source");
                 Directory.CreateDirectory(replicaDirPath);
             }
         }
