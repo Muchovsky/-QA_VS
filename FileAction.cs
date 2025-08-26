@@ -4,5 +4,5 @@ public enum FileAction
 {
     Added,
     Removed,
-    Modified
+    Replaced
 }

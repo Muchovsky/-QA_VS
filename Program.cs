@@ -11,8 +11,8 @@ string replicaPath = args[1];
 int interval = int.Parse(args[2]);
 string logPath = args[3];
 
-Synchronizer synchronizer = new Synchronizer();
 Logger logger = new Logger(logPath);
+Synchronizer synchronizer = new Synchronizer(logger);
 
 
 while (true)

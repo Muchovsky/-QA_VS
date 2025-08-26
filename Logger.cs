@@ -1,9 +1,9 @@
 ﻿namespace QA_VS;
 
-public class Logger
+public class Logger : ILogger
 {
-    private readonly string logPath;
-    private readonly string logFile = "log.txt";
+    readonly string logPath;
+    readonly string logFile = "log.txt";
 
     public Logger(string logPath)
     {
@@ -21,7 +21,7 @@ public class Logger
         LogEntry(message);
     }
 
-    private void LogEntry(string entry)
+    void LogEntry(string entry)
     {
         Directory.CreateDirectory(logPath);
         string logFilePath = Path.Combine(logPath, logFile);
