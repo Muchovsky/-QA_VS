@@ -27,6 +27,7 @@ public class Logger : ILogger
         string logFilePath = Path.Combine(logPath, logFile);
         string date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         string combinedEntry = $"{date} {entry}";
+        Console.WriteLine(combinedEntry);
         File.AppendAllText(logFilePath, combinedEntry + Environment.NewLine);
     }
 }

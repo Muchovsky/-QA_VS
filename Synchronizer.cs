@@ -42,7 +42,6 @@ public class Synchronizer
         catch (Exception e)
         {
             Console.WriteLine("The process failed: {0}", e);
-            iLogger.Log("Error Occured");
         }
     }
 
@@ -56,7 +55,6 @@ public class Synchronizer
             fileList.Add(relativePath, new FileInfo(file));
         }
 
-        Console.WriteLine($"Found {fileList.Count} files in {path}");
         return fileList;
     }
 
